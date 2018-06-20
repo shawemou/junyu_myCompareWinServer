@@ -1,0 +1,187 @@
+package com.my.dao;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+import com.my.dao.base.CommonDao;
+import com.my.util.AESCodec;
+import com.my.util.Check;
+import com.my.util.GUID;
+import com.my.util.Log4jUtil;
+
+public class WebUserDao extends CommonDao  {
+	/**
+	 * 查询列表
+	 * @param mobileMap
+	 * @return
+	 */
+	public List<Map<String, Object>> list(Map<String,String> userMap){
+		String sql = "SELECT * FROM T_USER T WHERE 1=1 ";
+		List<Object> params = new ArrayList<Object>();
+		if( !Check.IsStringNULL(userMap.get("login_name")) ){
+			sql += " AND T.LOGIN_NAME LIKE ? ";
+			params.add("%" + userMap.get("login_name") + "%");
+		}
+		if( !Check.IsStringNULL(userMap.get("name")) ){
+			sql += " AND T.NAME LIKE ? ";
+			params.add("%" + userMap.get("name") + "%");
+		}
+		if( !Check.IsStringNULL(userMap.get("gender")) ){
+			sql += " AND T.GENDER = ? ";
+			params.add(userMap.get("gender"));
+		}
+		if( !Check.IsStringNULL(userMap.get("id_number")) ){
+			sql += " AND T.ID_NUMBER like ? ";
+			params.add( "%" + userMap.get("id_number")  + "%");
+		}
+		if( !Check.IsStringNULL(userMap.get("busable")) ){
+			sql += " AND T.BUSABLE = ? ";
+			params.add(userMap.get("busable"));
+		}
+		
+		int page_count = Check.BeginIndex(userMap.get("page_count")) ;
+		page_count = page_count == 0 ? 10 : page_count; 
+		return queryReturnListMap(sql,params,"UPDATE_TIME DESC,CREATE_TIME DESC,GUID DESC", Check.BeginIndex(userMap.get("page_no")), page_count);
+	}
+	
+	/**
+	 * 列表行数
+	 * @param userMap
+	 * @return
+	 */
+	public int queryCount(Map<String,String> userMap){
+		String sql = "SELECT COUNT(1) FROM T_USER T WHERE 1=1 ";
+		List<Object> params = new ArrayList<Object>();
+		if( !Check.IsStringNULL(userMap.get("login_name")) ){
+			sql += " AND T.LOGIN_NAME LIKE ? ";
+			params.add("%" + userMap.get("login_name") + "%");
+		}
+		if( !Check.IsStringNULL(userMap.get("name")) ){
+			sql += " AND T.NAME LIKE ? ";
+			params.add("%" + userMap.get("name") + "%");
+		}
+		if( !Check.IsStringNULL(userMap.get("gender")) ){
+			sql += " AND T.GENDER = ? ";
+			params.add(userMap.get("gender"));
+		}
+		if( !Check.IsStringNULL(userMap.get("id_number")) ){
+			sql += " AND T.ID_NUMBER like ? ";
+			params.add( "%" + userMap.get("id_number")  + "%");
+		}
+		if( !Check.IsStringNULL(userMap.get("busable")) ){
+			sql += " AND T.BUSABLE = ? ";
+			params.add(userMap.get("busable"));
+		}
+		Object obj = querySingleValue(sql, params);
+		return Check.BeginIndex(obj.toString());
+	}
+	
+	/**
+	 * 新增窗口用户
+	 * @param userMap
+	 * @param loginMap
+	 * @return
+	 */
+	public int saveUser(Map<String,String> userMap,Map<String, Object> loginMap){
+		try{
+			String sql = "SELECT COUNT(1) FROM T_USER T WHERE T.LOGIN_NAME = ?";
+			List<Object> paramsCount = new ArrayList<Object>();
+			paramsCount.add(userMap.get("login_name"));
+			Object obj = querySingleValue(sql, paramsCount);
+			if(Check.BeginIndex(obj.toString()) == 0){
+				sql = "INSERT INTO T_USER (GUID,LOGIN_NAME,PASSWORD,NAME,GENDER,ID_NUMBER,DEPARTMENT,DETAIL_DES,BUSABLE,USER_GUID)"
+					+ " VALUES (?,?,?,?,?,?,?,?,?,?)";
+				List<Object> params = new ArrayList<Object>();
+				params.add( new GUID().toString() );
+				params.add( userMap.get("login_name") );
+				params.add( AESCodec.aesEncrypt("111111") );
+				params.add( userMap.get("name") );
+				params.add( userMap.get("gender") );
+				params.add( userMap.get("id_number") );
+				params.add( userMap.get("department") );
+				params.add( userMap.get("detail_des") );
+				params.add( userMap.get("busable") );
+				params.add( loginMap.get("GUID") );
+				
+				return modify(sql,params) > 0 ? 1 : 0;
+			}else{
+				return 2;
+			}
+		}catch (Exception e) {
+			Log4jUtil.log.error("保存用户信息时异常", e);
+			return 0;
+		}
+	}
+	
+	/**
+	 * 变更
+	 * @param mobileMap
+	 * @param guid
+	 * @return
+	 */
+	public int updateUser(Map<String,String> userMap){
+		String sql = "SELECT COUNT(1) FROM T_USER T WHERE T.GUID <> ? AND T.LOGIN_NAME = ?";
+		List<Object> paramsCount = new ArrayList<Object>();
+		paramsCount.add(userMap.get("guid"));
+		paramsCount.add(userMap.get("login_name"));
+		Object obj = querySingleValue(sql, paramsCount);
+		if(Check.BeginIndex(obj.toString()) == 0){
+			sql = "UPDATE T_USER T SET LOGIN_NAME = ?,NAME = ?,GENDER = ?,ID_NUMBER = ?,DEPARTMENT = ?,DETAIL_DES = ?,BUSABLE=?,UPDATE_TIME=SYSDATE"
+				+ " WHERE T.GUID = ?";
+			List<Object> params = new ArrayList<Object>();
+			params.add( userMap.get("login_name") );
+			params.add( userMap.get("name") );
+			params.add( userMap.get("gender") );
+			params.add( userMap.get("id_number") );
+			params.add( userMap.get("department") );
+			params.add( userMap.get("detail_des") );
+			params.add( userMap.get("busable") );
+			params.add( userMap.get("guid") );
+			return modify(sql,params) > 0 ? 1 : 0;
+		}else{
+			return 2;
+		}
+	}
+	
+	public int checkLoginName(Map<String,String> userMap){
+		String sql = "SELECT COUNT(1) FROM T_USER T WHERE T.LOGIN_NAME = ?";
+		List<Object> paramsCount = new ArrayList<Object>();
+		paramsCount.add(userMap.get("login_name"));
+		Object obj = querySingleValue(sql, paramsCount);
+		if( obj != null){
+			if(Check.BeginIndex(obj.toString()) == 0){
+				return 0;
+			}else{
+				return 1;
+			}
+		}else{
+			return 2;
+		}
+		
+	}
+	
+	/**
+	 * 密码重置
+	 * @param guid
+	 * @return
+	 */
+	public int updatePwd(String guid){
+		String sql = "UPDATE T_USER T SET T.PASSWORD = '"+AESCodec.aesEncrypt("111111")+"',T.SECRET_TYPE='1' WHERE T.GUID = ?";
+		List<Object> params = new ArrayList<Object>();
+		params.add( guid );
+		return modify(sql,params);
+	}
+	
+	/**
+	 * 获取单个用户信息
+	 * @param guid
+	 * @return
+	 */
+	public Map<String, Object> loadUser(String guid){
+		List<Object> params = new ArrayList<Object>();
+		params.add(guid);
+		List<Map<String,Object>> list = queryReturnListMap("SELECT * FROM T_USER T WHERE GUID = ? ", params);
+		return list.size() > 0 ? list.get(0) : null;
+	}
+}

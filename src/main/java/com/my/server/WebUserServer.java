@@ -1,0 +1,158 @@
+package com.my.server;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+
+import javax.servlet.http.HttpServletRequest;
+
+import org.json.JSONObject;
+
+import com.my.dao.WebUserDao;
+import com.my.util.Check;
+import com.my.util.Log4jUtil;
+
+public class WebUserServer  extends WebUserValidateServer{
+	public String methed(String method, Map<String,String> userMap,HttpServletRequest request){
+		JSONObject resultJson = new JSONObject();
+		try{
+			if( !Check.IsStringNULL(method) ){
+				if( method.equals("list") ){//列表
+					String page_no = userMap.get("page_no");
+					if(Check.BeginIndex(page_no) <= 0){
+						userMap.put("page_no","1");
+					}
+					resultJson.put("data", setJsonList( list(userMap) ));
+					resultJson.put("itemCount",queryCount(userMap) );
+					resultJson.put("page_no",userMap.get("page_no") );
+				}else if(method.equals("add")){//新增
+					if(validate(userMap, resultJson, "1")){
+						Map<String, Object> loginMap = (Map<String, Object>) request.getSession().getAttribute("user");
+						int i = saveUser(userMap, loginMap);//0失败，1成功 ，2已存在
+						if(i == 0){
+							resultJson.put("success",false);
+							resultJson.put("info","保存失败");
+						}else if(i == 1){
+							resultJson.put("success",true);
+							resultJson.put("info","保存成功");
+						}else {
+							resultJson.put("success",false);
+							resultJson.put("info","登录名已存在无法保存");
+						}
+					}
+				}else if( method.equals("update") ){//修改
+					if(validate(userMap, resultJson, "2")){
+						int i = updateUser(userMap);
+						if(i == 0){
+							resultJson.put("success",false);
+							resultJson.put("info","保存失败");
+						}else if(i == 1){
+							resultJson.put("success",true);
+							resultJson.put("info","保存成功");
+						}else{
+							resultJson.put("success",false);
+							resultJson.put("info","登录名已存在无法保存");
+						}
+					}
+				}else if(method.equals("checkLoginName")){//检测登录名是否存在
+					if( validateLoginName(userMap, resultJson) ){
+						int i = checkLoginName(userMap);
+						if( i == 0){
+							resultJson.put("success",true);
+							resultJson.put("info","此登录名可以使用");
+						}else if(i == 1){
+							resultJson.put("success",false);
+							resultJson.put("info","此登录名已存在");
+						}else{
+							resultJson.put("success",false);
+							resultJson.put("info","查询失败,服务器异常");
+						}
+					}
+				}else if(method.equals("updatePwd") ){//重置密码
+					if( Check.IsStringNULL(userMap.get("guid")) ){
+						resultJson.put("success",false);
+						resultJson.put("info","信息缺失,无法重置密码");
+					}else{
+						if( updatePwd(userMap.get("guid")) > 0){
+							resultJson.put("success",true);
+							resultJson.put("info","重置密码成功");
+						}else{
+							resultJson.put("success",false);
+							resultJson.put("info","重置密码失败");
+						}
+					}
+				}else if(method.equals("loadUser")){//加载单个用户信息
+					resultJson = setJsonMap(loadUser(userMap));
+				}else{
+					resultJson.put("success",false);
+					resultJson.put("info","调用地址不存在");
+				}
+				
+			}else{
+				resultJson.put("success",false);
+				resultJson.put("info","调用地址不存在");
+			}
+		}catch (Exception e) {
+			e.printStackTrace();
+		}
+		return resultJson.toString();
+	}
+	
+	public List<Map<String, Object>> list(Map<String,String> userMap){
+		List<Map<String, Object>> list = new WebUserDao().list(userMap);
+		for(Map<String, Object> map : list){
+			if(map.get("SECRET_TYPE") != null ){
+				if( map.get("SECRET_TYPE").toString().equals("2")){
+					map.put("SECRET_KEY", "用户已修改");
+				}else{
+					map.put("SECRET_KEY", "初始密码");
+				}
+			} 
+		}
+		return list;
+	}
+	
+	public int queryCount(Map<String,String> userMap){
+		return new WebUserDao().queryCount(userMap);
+	}
+	
+	public int saveUser(Map<String,String> userMap,Map<String, Object> loginMap){
+		return new WebUserDao().saveUser(userMap, loginMap);
+	}
+	
+	public Map<String, Object> loadUser(Map<String,String> userMap){
+		return new WebUserDao().loadUser(userMap.get("guid"));
+	}
+	
+	public int updateUser(Map<String,String> userMap){
+		return new WebUserDao().updateUser(userMap);
+	}
+	
+	public int checkLoginName(Map<String,String> userMap){
+		return new WebUserDao().checkLoginName(userMap);
+	}
+	
+	public int updatePwd(String guid){
+		return new WebUserDao().updatePwd(guid);
+	}
+	
+	public static org.json.JSONArray setJsonList(List<Map<String,Object>> list){
+		org.json.JSONArray jary = new org.json.JSONArray();
+		for(Map<String,Object> map : list){
+			jary.put(map);
+		}
+		return jary;
+	}
+	public static JSONObject setJsonMap(Map<String,Object> map){
+		JSONObject resultJSON = new JSONObject();
+		try{
+			for (Entry<String, Object> entry : map.entrySet()) {  
+				resultJSON.put(entry.getKey(), entry.getValue());
+			}  
+		}catch (Exception e) {
+			e.printStackTrace();
+			Log4jUtil.log.error("Map转json出错", e);
+		}
+		return resultJSON;
+	}
+}

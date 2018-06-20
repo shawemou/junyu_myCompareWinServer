@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://xfire.codehaus.org/config/1.0">
+	<service>
+		<name>Webservice</name>
+		<serviceClass>com.my.webservices.IWebservice</serviceClass>
+		<implementationClass>
+			com.my.webservices.WebserviceImpl
+		</implementationClass>
+		<namespace>http://services.my.com</namespace>
+		<serviceFactory>jsr181</serviceFactory><!--这个必须配置，否则还是显示in0...-->
+		<style>wrapped</style>
+		<use>literal</use>
+		<scope>application</scope>
+	</service>
+</beans>

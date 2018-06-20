@@ -1,0 +1,246 @@
+package com.my.server;
+
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import com.custle.sdk.TestIDPhotoAuthService;
+import com.my.bean.CompareReturnBean;
+import com.my.bean.VisitInfoBean;
+import com.my.common.ReadSetting;
+import com.my.common.ReturnBean;
+import com.my.common.EnumInstance.EReturn;
+import com.my.common.EnumInstance.EReturnCompare;
+import com.my.common.EnumInstance.EReturnJY;
+import com.my.dao.WSCompareDao;
+import com.my.util.Check;
+import com.my.util.Log4jUtil;
+
+public class WSCompareServer {
+
+	public void client(VisitInfoBean viBean, ReturnBean bean){
+		List<Map<String, Object>> list = new WSCompareDao().findUser(viBean, bean);
+		if(list == null){
+			bean.setCode(EReturn.RT_InError);
+		}else if( list.size() <= 0){
+			bean.setCode(EReturnCompare.RT_NotMatch_Format_Login);
+		}else{
+			Map<String, Object> map = list.get(0);
+			viBean.setUserMap(map);
+			if( map.get("BUSABLE") == null || map.get("BUSABLE").toString().equals("2") ){
+				bean.setCode(EReturnCompare.RT_NotMatch_Format_Busable);
+			}else{
+				//本地比对服务
+				localCompare(viBean, bean);
+			}
+		}
+		
+		// 三照片比对后，多源认证接口	
+	    if( EReturnCompare.RT_Success.equals(bean.getCode()) ){
+	    	sourceCompare(viBean, bean);
+	    }
+	}
+	
+	public void localCompare(VisitInfoBean viBean, ReturnBean bean){
+		//翻拍照比对现场照
+		Future<CompareReturnBean> fs1 = null;
+		ExecutorService es1 = Executors.newSingleThreadExecutor();
+    	if( !Check.IsStringNULL(viBean.getCompareBean().getStrIDPhoto()) && !Check.IsStringNULL(viBean.getCompareBean().getStrUserPhoto())){
+    		Log4jUtil.log.warn("翻拍照比对现场照比对开始");
+    		fs1 = es1.submit(new WSCompareServerThread(viBean.getCompareBean().getStrIDPhoto(), viBean.getCompareBean().getStrUserPhoto()) );
+    	}
+    	
+    	//翻拍照比对芯片照
+    	Future<CompareReturnBean> fs2 = null;
+    	ExecutorService es2 = Executors.newSingleThreadExecutor();
+    	if( !Check.IsStringNULL(viBean.getCompareBean().getStrIDPhoto()) && !Check.IsStringNULL(viBean.getCompareBean().getStrChipPhoto())){
+    		Log4jUtil.log.warn("翻拍照比对芯片照比对开始");
+    		fs2 = es2.submit(new WSCompareServerThread(viBean.getCompareBean().getStrIDPhoto(), viBean.getCompareBean().getStrChipPhoto()) );
+    	}
+    	
+    	//现场照比对芯片照
+    	Future<CompareReturnBean> fs3 = null;
+    	ExecutorService es3 = Executors.newSingleThreadExecutor();
+    	if( !Check.IsStringNULL(viBean.getCompareBean().getStrUserPhoto()) && !Check.IsStringNULL(viBean.getCompareBean().getStrChipPhoto())){
+    		Log4jUtil.log.warn("现场照比对芯片照比对开始");
+    		fs3 = es3.submit(new WSCompareServerThread(viBean.getCompareBean().getStrUserPhoto(), viBean.getCompareBean().getStrChipPhoto()) );
+    	}
+    	
+    	CompareReturnBean rbean1 = null;
+    	if(fs1 != null){
+			try {
+				rbean1 = fs1.get();
+				bean.setCrBean1(rbean1);
+			} catch (Exception e) {
+				Log4jUtil.log.error("翻拍照比对现场照比较线程1异常", e);
+			}finally{
+				es1.shutdown();
+			}
+		}
+    	
+    	CompareReturnBean rbean2 = null;
+    	if(fs2 != null){
+			try {
+				rbean2 = fs2.get();
+				bean.setCrBean2(rbean2);
+			} catch (Exception e) {
+				Log4jUtil.log.error("翻拍照比对芯片照比较线程2异常", e);
+			}finally{
+				es2.shutdown();
+			}
+		}
+    	
+    	CompareReturnBean rbean3 = null;
+    	if(fs3 != null){
+			try {
+				rbean3 = fs3.get();
+				bean.setCrBean3(rbean3);
+			} catch (Exception e) {
+				Log4jUtil.log.error("现场照比对芯片照比较线程3异常", e);
+			}finally{
+				es3.shutdown();
+			}
+		}
+    	
+    	//翻拍照、现场照 必须包含的
+    	if( fs1 != null){
+    		String code = resetCode(rbean1, ReadSetting.getInstance().getSimilarity1());
+    		if( !code.equals(EReturnCompare.RT_Success)  ){
+	    		if( code.equals(EReturn.RT_Timeout) || code.equals(EReturn.RT_InError) || code.equals(EReturnCompare.RT_Fail)){
+	    			bean.setCode(code);
+	    		}else if(EReturnJY.RT_NotMatch_Format_IDPhoto.equals(code)){
+	    			bean.setCode(EReturnCompare.RT_NotMatch_Format_IDPhoto);
+	    		}else if(EReturnJY.RT_NotMatch_Format_Photo.equals(code)){
+	    			bean.setCode(EReturnCompare.RT_NotMatch_Format_UserPhoto);
+	    		}else if( EReturnJY.RT_Fail_Feature_IdPhoto.equals(code)){
+	    			bean.setCode(EReturnCompare.RT_Not_Face_IDPhoto);
+	    		}else if( EReturnJY.RT_Fail_Feature.equals(code) ){
+	    			bean.setCode(EReturnCompare.RT_Not_Face_UserPhoto);
+	    		}else if( EReturnJY.RT_More_Face_IDPhoto.equals(code) ){
+	    			bean.setCode(EReturnCompare.RT_More_Face_IDPhoto);
+	    		}else if( EReturnJY.RT_More_Face_Photo.equals(code) ){
+	    			bean.setCode(EReturnCompare.RT_More_Face_UserPhoto);
+	    		}else{
+	    			bean.setCode(EReturn.RT_InError);
+	    		}
+	    		return;
+    		}
+    	}
+    	
+    	//翻拍照、芯片照 必须包含的
+    	if( fs2 != null){
+    		String code = resetCode(rbean2, ReadSetting.getInstance().getSimilarity2());
+    		if( !code.equals(EReturnCompare.RT_Success)  ){
+	    		if( code.equals(EReturn.RT_Timeout) || code.equals(EReturn.RT_InError) || code.equals(EReturnCompare.RT_Fail)){
+	    			bean.setCode(code);
+	    		}else if(EReturnJY.RT_NotMatch_Format_IDPhoto.equals(code)){
+	    			bean.setCode(EReturnCompare.RT_NotMatch_Format_IDPhoto);
+	    		}else if(EReturnJY.RT_NotMatch_Format_Photo.equals(code)){
+	    			bean.setCode(EReturnCompare.RT_NotMatch_Null_ChipPhoto);
+	    		}else if( EReturnJY.RT_Fail_Feature_IdPhoto.equals(code)){
+	    			bean.setCode(EReturnCompare.RT_Not_Face_IDPhoto);
+	    		}else if( EReturnJY.RT_Fail_Feature.equals(code) ){
+	    			bean.setCode(EReturnCompare.RT_Not_Face_ChipPhoto);
+	    		}else if( EReturnJY.RT_More_Face_IDPhoto.equals(code) ){
+	    			bean.setCode(EReturnCompare.RT_More_Face_IDPhoto);
+	    		}else if( EReturnJY.RT_More_Face_Photo.equals(code) ){
+	    			bean.setCode(EReturnCompare.RT_More_Face_ChipPhoto);
+	    		}else{
+	    			bean.setCode(EReturn.RT_InError);
+	    		}
+	    		return;
+    		}
+    	}
+    	
+    	//现场照、芯片照 必须包含的
+    	if( fs3 != null){
+    		String code = resetCode(rbean3, ReadSetting.getInstance().getSimilarity3());
+    		if( !code.equals(EReturnCompare.RT_Success)  ){
+	    		if( code.equals(EReturn.RT_Timeout) || code.equals(EReturn.RT_InError) || code.equals(EReturnCompare.RT_Fail)){
+	    			bean.setCode(code);
+	    		}else if(EReturnJY.RT_NotMatch_Format_IDPhoto.equals(code)){
+	    			bean.setCode(EReturnCompare.RT_NotMatch_Format_UserPhoto);
+	    		}else if(EReturnJY.RT_NotMatch_Format_Photo.equals(code)){
+	    			bean.setCode(EReturnCompare.RT_NotMatch_Null_ChipPhoto);
+	    		}else if( EReturnJY.RT_Fail_Feature_IdPhoto.equals(code)){
+	    			bean.setCode(EReturnCompare.RT_Not_Face_UserPhoto);
+	    		}else if( EReturnJY.RT_Fail_Feature.equals(code) ){
+	    			bean.setCode(EReturnCompare.RT_Not_Face_ChipPhoto);
+	    		}else if( EReturnJY.RT_More_Face_IDPhoto.equals(code) ){
+	    			bean.setCode(EReturnCompare.RT_More_Face_UserPhoto);
+	    		}else if( EReturnJY.RT_More_Face_Photo.equals(code) ){
+	    			bean.setCode(EReturnCompare.RT_More_Face_ChipPhoto);
+	    		}else{
+	    			bean.setCode(EReturn.RT_InError);
+	    		}
+	    		return;
+    		}
+    	}
+    	bean.setCode(EReturnCompare.RT_Success);
+	}
+	
+	/**
+	 * 相似度比较
+	 * @param ri
+	 * @param cbean
+	 * @return
+	 */
+	private static String resetCode(CompareReturnBean rbean, String similarity){
+		if( rbean == null){
+			return EReturn.RT_InError;
+		}else{
+			if( rbean.getCode() == null || EReturn.RT_InError.equals(rbean.getCode()) ){
+				return EReturn.RT_InError;
+			}else if(EReturn.RT_Timeout.equals(rbean.getCode())){
+				return EReturn.RT_Timeout;
+			}else if(EReturnJY.RT_Success.equals(rbean.getCode())
+					|| EReturnJY.RT_Unsure.equals(rbean.getCode())
+					|| EReturnJY.RT_Fail.equals(rbean.getCode()) ){
+				if(rbean.getSimilarity() >= Check.IsNum(similarity)){
+					return EReturnCompare.RT_Success;
+				}else{
+					return EReturnCompare.RT_Fail;
+				}
+				
+			//左侧、右侧检测人脸失败，左侧、右侧检测到多张人脸
+			}else if(EReturnJY.RT_Fail_Feature_IdPhoto.equals(rbean.getCode())
+					|| EReturnJY.RT_Fail_Feature.equals(rbean.getCode())
+					|| EReturnJY.RT_NotMatch_Format_IDPhoto.equals(rbean.getCode())
+					|| EReturnJY.RT_NotMatch_Format_Photo.equals(rbean.getCode()) 
+					|| EReturnJY.RT_More_Face_IDPhoto.equals(rbean.getCode()) 
+					|| EReturnJY.RT_More_Face_Photo.equals(rbean.getCode()) ){
+				return rbean.getCode();
+			}else{
+				return EReturn.RT_InError;
+			}
+		}
+	}
+	
+	/**
+	 * 多源认证接口服务
+	 * @param viBean
+	 * @param bean
+	 */
+	public void sourceCompare(VisitInfoBean viBean, ReturnBean bean){
+		CompareReturnBean crBean4 = bean.getCrBean4();
+		String resultString = TestIDPhotoAuthService.runQryIDPhoto(viBean.getCompareBean().getName(),viBean.getCompareBean().getCertid(), viBean.getCompareBean().getStrIDPhoto());
+		if( !Check.IsStringNULL(resultString)){
+			try {
+				JSONObject json = new JSONObject(resultString);
+				if(json.has("Result") && !Check.IsStringNULL(json.getString("Result")) ){
+					crBean4.setCode(json.getString("Result"));
+				}
+				if(json.has("Return") && !Check.IsStringNULL(json.getString("Return")) ){
+					crBean4.setInfo(json.getString("Return"));
+				}
+			} catch (JSONException e) {
+				Log4jUtil.log.error("解析多源认证接口返回json异常", e);
+			}
+		}
+	}
+}

@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns="http://java.sun.com/xml/ns/javaee" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="2.5" xsi:schemaLocation="http://java.sun.com/xml/ns/javaee   http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd">
+  <filter>
+	<filter-name>LoginFilter</filter-name>
+    <filter-class>com.my.filter.LoginFilter</filter-class>
+  </filter>
+  <filter-mapping>
+	<filter-name>LoginFilter</filter-name>
+	<url-pattern>/*</url-pattern>
+  </filter-mapping>
+  
+  <servlet>
+    <servlet-name>XFireServlet</servlet-name>
+    <servlet-class>org.codehaus.xfire.transport.http.XFireConfigurableServlet</servlet-class>
+    <load-on-startup>0</load-on-startup>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>XFireServlet</servlet-name>
+    <url-pattern>/services/*</url-pattern>
+  </servlet-mapping>
+  
+  <servlet>
+	<servlet-name>InitServlet</servlet-name>
+	<servlet-class>com.my.servlet.InitServlet</servlet-class>
+	<load-on-startup>1</load-on-startup>
+  </servlet>
+  
+  <servlet>
+	<servlet-name>webUser</servlet-name>
+	<servlet-class>com.my.servlet.WebUserServlet</servlet-class>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>webUser</servlet-name>
+    <url-pattern>/webUser</url-pattern>
+  </servlet-mapping>
+  
+  <servlet>
+	<servlet-name>webLogin</servlet-name>
+	<servlet-class>com.my.servlet.WebLoginServlet</servlet-class>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>webLogin</servlet-name>
+    <url-pattern>/webLogin</url-pattern>
+  </servlet-mapping>
+  
+  <error-page>
+	<error-code>404</error-code>
+	<location>/404.html</location>
+  </error-page>
+  <error-page>
+	<error-code>500</error-code>
+	<location>/500.html</location>
+  </error-page>
+
+  <error-page>
+	<error-code>403</error-code>
+	<location>/error.html</location>
+  </error-page>
+
+  <error-page>
+	<error-code>400</error-code>
+	<location>/error.html</location>
+  </error-page>
+  
+  <welcome-file-list>
+    <welcome-file>login.html</welcome-file>
+  </welcome-file-list>
+</web-app>
+

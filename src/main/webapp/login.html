@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible"  content="IE=edge,Chrome=1"/>
+<title>窗口人脸识别系统--用户管理</title>
+<meta http-equiv="Content-Language" content="zh-cn" />
+<meta http-equiv="pragma" content="no-cache">
+<meta http-equiv="cache-control" content="no-cache">
+<meta http-equiv="expires" content="0">
+<link rel="icon" type="image/x-icon" href="res/images/zcurd/favicon.ico">
+<link rel="stylesheet" type="text/css" href="res/js/jquery-easyui/themes/gray/easyui.css">
+<link rel="stylesheet" type="text/css" href="res/js/jquery-easyui/themes/icon.css?1">
+<link rel="stylesheet" type="text/css" href="res/js/jquery-easyui/themes/color.css">
+<link rel="stylesheet" type="text/css" href="res/css/common.css">
+
+<script type="text/javascript" src="res/js/jquery-easyui/jquery.min.js"></script>
+<script type="text/javascript" src="res/js/jquery-easyui/jquery.easyui.min.js?1"></script>
+<script type="text/javascript" src="res/js/jquery-easyui/locale/easyui-lang-zh_CN.js"></script>
+<script type="text/javascript" src="res/js/common.js?14"></script>
+<script type="text/javascript" src="res/js/util.js?1"></script>
+</head>
+<body style="visibility: hidden;" class="easyui-layout" border="false">
+<link rel="stylesheet" type="text/css" href="res/css/login-style.css?6">
+
+<style>
+body{
+	background-color:#1c77ac; 
+	background-image:url(res/css/images/light.png);
+    background-repeat:no-repeat; 
+    background-position:center top; overflow:hidden;
+}
+</style>
+<div id="mainBody">
+	<div id="cloud1" class="cloud"></div>
+	<div id="cloud2" class="cloud"></div>
+</div>
+<div class="logintop">
+    <span>窗口人脸识别系统--用户管理</span>
+</div>
+<form id="ff" class="easyui-form" method="post" action="zcurdHead/main" >
+<div class="loginbody">
+    <span class="systemlogo" style="height: 51px;margin-top: 5%;"></span>
+    <div class="loginbox loginbox1">
+        <ul>
+            <li><input id="username" name="username" type="text" class="loginuser easyui-validatebox" data-options="required:true,validType:'length[2,20]'"  placeholder="用户名"/></li>
+            <li><input id="password" name="password" type="password" class="loginpwd easyui-validatebox"  data-options="required:true"  placeholder="密码"/></li>
+            <li>
+                <span style="width: 127px;margin: 0px;display: inline;"><button type="button" href="#" id="btn_login" class="loginbtn" onclick="javascript:login();"/>登录</button></span>
+                <span style="width: 127px;margin: 0px;display: inline;" id="loginMsg"></span>
+            </li>
+        
+        </ul>
+    </div>
+</div>
+<div class="loginbm">
+	欢迎使用窗口人脸识别系统--用户管理
+	<!-- 友情下载&nbsp;&nbsp;
+   	<a href="#">使用手册</a>
+   	 -->
+</div>
+</form>
+<script type="text/javascript">
+	$(function(){
+		 $('.loginbox').css({'position': 'absolute', 'left': ($(window).width() - 692) / 2});
+	        $(window).resize(function () {
+	            $('.loginbox').css({'position': 'absolute', 'left': ($(window).width() - 692) / 2});
+	        })
+	});
+	//回车登陆
+	document.onkeydown = function() {
+	    if(event.keyCode==13) {
+	    	login();
+	        return false;                               
+	    }
+	}
+	function login() {
+		if($("#ff").form('validate')) {
+			$("#btn_login").attr("disabled", "disabled");
+			$("#loginMsg").html("登录中...");
+			var param = {"login_name":$(":input[name='username']").val(), "login_psd":$(":input[name='password']").val()};
+			$.post("webLogin", param, function(data) {
+				$("#btn_login").removeAttr("disabled");
+				$("#loginMsg").html("");
+				//console.log(data);
+				queryCallBack(data);
+			});
+		}
+	}
+	
+	function queryCallBack(data) {
+		try {
+			var myobj = eval('(' + data + ')');
+		} catch (Error) {
+			alert("数据转换失败,格式不正确！");
+			return;
+		}
+		if (myobj == undefined) {
+			alert("未获取到数据！");
+			return;
+		}
+		if (myobj["success"]) {
+			//window.location.href = "404.html?date=" + newGuid();
+			window.location.href = "index.html?date=" + newGuid();
+		} else {
+			showWarnMsg(myobj["info"]);
+		}
+	}
+	
+	//生成GUID类似的随机数
+	function newGuid() {
+		var guid = "";
+		for ( var i = 1; i <= 32; i++) {
+			var n = Math.floor(Math.random() * 16.0).toString(16);
+			guid += n;
+			if ((i == 8) || (i == 12) || (i == 16) || (i == 20))
+				guid += "-";
+		}
+		return guid;
+	}
+</script>
+
+</body>
+</html>

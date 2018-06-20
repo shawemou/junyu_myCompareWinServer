@@ -1,0 +1,167 @@
+package com.my.dao.base;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.List;
+import java.util.Map;
+
+import com.my.common.ReadSetting;
+import com.my.util.Log4jUtil;
+
+public class CommonDao {
+
+	public Connection getConnection(){
+		String con_url = ReadSetting.getInstance().getCon_url();
+		String con_user = ReadSetting.getInstance().getConn_user();
+		String con_pwd = ReadSetting.getInstance().getConn_pwd();
+		try {
+			Class.forName("oracle.jdbc.driver.OracleDriver");
+			return DriverManager.getConnection(con_url, con_user, con_pwd);
+		} catch (ClassNotFoundException e) {
+			e.printStackTrace();
+			Log4jUtil.log.error("获取数据库链接时,ClassNotFoundException", e);
+		} catch (Exception e) {
+			Log4jUtil.log.error("获取数据库链接异常", e);
+		} 
+		return null;
+	}
+	
+	public Object querySingleValue(String sql, List<Object> params){
+		Connection conn=null;
+		PreparedStatement stmt = null;
+		ResultSet rs=null;
+		Object ret = null;
+		try{
+			conn= getConnection();
+			stmt = conn.prepareStatement(sql);
+			for(int i=0;i<params.size();i++){
+				stmt.setObject(i+1, params.get(i));
+			}
+			rs = stmt.executeQuery();
+			if(rs.next()){
+				ret=rs.getObject(1);
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			closeRes(rs,stmt,conn);
+		}
+		return ret;
+	}
+	
+	
+	public List<Map<String, Object>> queryReturnListMap(String preparedSql,List<Object> params) {
+		Connection conn = null;
+		PreparedStatement stmt = null;
+		ResultSet rs = null;
+//		System.out.println(preparedSql);
+		try{
+			conn = getConnection();
+			stmt = conn.prepareStatement(preparedSql);
+			for(int i = 0; i < params.size(); i++){
+				stmt.setString(i + 1, params.get(i).toString());
+			}
+			rs = stmt.executeQuery();
+			return new ListMapResultSetExtractor().extractData(rs);
+		}catch(Exception e){
+			Log4jUtil.log.error("数据库操作异常", e);
+		}finally{
+			closeRes(rs,stmt,conn);
+		}
+		return null;
+	}
+	
+	public List<Map<String, Object>> queryReturnListMap(String preparedSql,List<Object> params,String orderBy, int pageNo, int pageSize) {
+		String sql = wriePagingSql(preparedSql, pageNo, pageSize,orderBy);
+//		System.out.println(sql);
+		Connection conn=null;
+		PreparedStatement stmt=null;
+		ResultSet rs=null;
+		try{
+			conn=getConnection();
+			stmt=conn.prepareStatement(sql);
+			for(int i=0;i<params.size();i++){
+				stmt.setObject(i+1, params.get(i));
+			}
+			rs = stmt.executeQuery();
+			return new ListMapResultSetExtractor().extractData(rs);
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			closeRes(rs,stmt,conn);
+		}
+		return null;
+	}
+	
+
+	public List<Map<String,Object>> queryReturnListMap(String sql){
+		Connection conn = null;
+		Statement stmt = null;
+		ResultSet rs = null;
+		try{
+			conn = getConnection();
+			stmt = conn.createStatement();
+			rs = stmt.executeQuery(sql);
+			return new ListMapResultSetExtractor().extractData(rs);
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			closeRes(rs,stmt,conn);
+		}
+		return null;
+	}
+	
+	public String wriePagingSql(String sql, int pageNo, int pageSize, String orderBy) {
+		orderBy=(null==orderBy)?"":orderBy;
+		return new StringBuilder(" select * from (select t.*, rownum ro from (")
+						 .append(sql)
+						 .append(" ")
+						 .append(orderBy.length() > 0 ? ("ORDER BY " + orderBy) : "")
+						 .append(") t where rownum <=")
+						 .append(((pageNo-1)*pageSize+pageSize))
+						 .append(" ) where ro >= ")
+						 .append(((pageNo-1)*pageSize+1))
+						 .toString();
+	}
+	
+	public int modify(String preparedSql, List<Object> params){
+		Connection conn = null;
+		PreparedStatement stmt = null;
+		ResultSet rs = null;
+		int ret = 0;
+		try{
+			conn = getConnection();
+			stmt= conn.prepareStatement(preparedSql);
+			for(int i = 0; i < params.size(); i++){
+				stmt.setObject(i + 1, params.get(i));
+			}
+			ret = stmt.executeUpdate();
+		}catch(Exception e){
+			e.printStackTrace();
+			return -1;
+		}finally{
+			closeRes(rs,stmt,conn);
+		}
+		return ret;
+	}
+	
+	public void closeRes(ResultSet rs,Statement stmt,Connection conn){
+		try {
+			if(rs != null){
+				rs.close();
+			}
+			if(stmt != null){
+				stmt.close();
+			}
+			if(conn != null ){
+				conn.close();
+			}			
+		} catch (SQLException e) {
+			Log4jUtil.log.error("关闭连接异常", e);
+		}
+	}
+}

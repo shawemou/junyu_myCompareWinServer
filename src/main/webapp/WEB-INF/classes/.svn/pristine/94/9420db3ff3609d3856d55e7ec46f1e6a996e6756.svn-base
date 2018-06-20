@@ -1,0 +1,48 @@
+package com.custle.sdk.auth.vo;
+
+import org.codehaus.jackson.annotate.JsonIgnore;
+import org.codehaus.jackson.annotate.JsonProperty;
+
+public class Face {
+
+	@JsonProperty("FacePhoto")
+	private String FacePhoto;
+
+	// 证件翻拍照数据
+	@JsonProperty("CopyIDPhoto")
+	private String CopyIDPhoto;
+		
+	@JsonProperty("Extend")
+	private String Extend;
+
+	@JsonIgnore
+	public String getFacePhoto() {
+		return FacePhoto;
+	}
+
+	@JsonIgnore
+	public void setFacePhoto(String facePhoto) {
+		FacePhoto = facePhoto;
+	}
+
+	@JsonIgnore
+	public String getExtend() {
+		return Extend;
+	}
+
+	@JsonIgnore
+	public void setExtend(String extend) {
+		Extend = extend;
+	}
+
+	@JsonIgnore
+	public String getCopyIDPhoto() {
+		return CopyIDPhoto;
+	}
+
+	@JsonIgnore
+	public void setCopyIDPhoto(String copyIDPhoto) {
+		CopyIDPhoto = copyIDPhoto;
+	}
+
+}

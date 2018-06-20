@@ -1,0 +1,59 @@
+package com.my.server;
+
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import com.custle.sdk.TestIDPhotoAuthService;
+import com.my.bean.CompareReturnBean;
+import com.my.bean.VisitInfoBean;
+import com.my.dao.WSSourceCompareDao;
+import com.my.util.Check;
+import com.my.util.Log4jUtil;
+
+/**
+ * @ClassName: WSSourceCompareServerThread 
+ * @Description: 多线程调用多源接口，保存比对结果
+ * @author lulinlin
+ * @date 2018-4-19 下午04:41:18 
+ *
+ */
+public class WSSourceCompareServerThread extends Thread {
+
+	private VisitInfoBean viBean;
+	
+	public WSSourceCompareServerThread(){}
+	
+	public WSSourceCompareServerThread(VisitInfoBean viBean){
+		this.viBean = viBean;
+	}
+	
+	public void run(){
+		CompareReturnBean crBean4 = new CompareReturnBean();//多源认证接口比对结果
+		String resultString = TestIDPhotoAuthService.runQryIDPhoto(viBean.getCompareBean().getName(),viBean.getCompareBean().getCertid(), viBean.getCompareBean().getStrIDPhoto());
+		if( !Check.IsStringNULL(resultString)){
+			try {
+				JSONObject json = new JSONObject(resultString);
+				if(json.has("Result") && !Check.IsStringNULL(json.getString("Result")) ){
+					crBean4.setCode(json.getString("Result"));
+				}
+				if(json.has("Return") && !Check.IsStringNULL(json.getString("Return")) ){
+					crBean4.setInfo(json.getString("Return"));
+				}
+			} catch (JSONException e) {
+				Log4jUtil.log.error("解析多源认证接口返回json异常", e);
+			}
+			
+			if( !Check.IsStringNULL(crBean4.getCode()) || !Check.IsStringNULL(crBean4.getInfo()) ){
+				new WSSourceCompareDao().saveCompare(viBean, crBean4);
+			}
+		}
+	}
+
+	public VisitInfoBean getViBean() {
+		return viBean;
+	}
+
+	public void setViBean(VisitInfoBean viBean) {
+		this.viBean = viBean;
+	}
+}

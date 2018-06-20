@@ -1,0 +1,33 @@
+package com.custle.sdk.auth.vo;
+
+import org.codehaus.jackson.annotate.JsonIgnore;
+import org.codehaus.jackson.annotate.JsonProperty;
+
+public class Sms {
+
+	@JsonProperty("Extend")
+	private String Extend;
+
+	@JsonProperty("Code")
+	private String Code;
+
+	@JsonIgnore
+	public String getExtend() {
+		return Extend;
+	}
+
+	@JsonIgnore
+	public void setExtend(String extend) {
+		Extend = extend;
+	}
+	
+	@JsonIgnore
+	public String getCode() {
+		return Code;
+	}
+
+	@JsonIgnore
+	public void setCode(String code) {
+		Code = code;
+	}
+}
